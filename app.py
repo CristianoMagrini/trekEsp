@@ -1,0 +1,74 @@
+import os
+import whisper
+import tkinter as tk
+from tkinter import messagebox
+import sounddevice as sd
+from scipy.io.wavfile import write
+import threading
+import numpy as np
+
+os.environ["PATH"] += os.pathsep + r"ffmpeg\bin"
+
+model = whisper.load_model("medium")
+
+outputDir = "audio"
+filename = os.path.join(outputDir, "recordedAudio.wav")
+recording = False
+fs = 44100
+
+root = tk.Tk()
+root.title("TREKESP")
+root.geometry("250x200+100+50")
+
+def audioRecording():
+    global recording
+    audioResult = []
+    try:
+        os.makedirs(outputDir, exist_ok=True)
+        print("Registrazione in corso...")
+
+        def callback(indata, frames, time, status):
+            if recording:
+                audioResult.append(indata.copy())
+
+        with sd.InputStream(samplerate=fs, channels=1, callback=callback):
+            while recording:
+                sd.sleep(100)
+
+        audioResult = np.concatenate(audioResult, axis=0)
+        write(filename, fs, audioResult)
+        print("Registrazione completata.")
+
+        transcribeAudio()
+
+    except Exception as e:
+        print(f"Errore nella registrazione: {e}")
+
+def transcribeAudio():
+    try:
+        print("Trascrizione in corso...")
+        result = model.transcribe(filename, fp16=False, language="it")
+        transcription = result["text"]
+        print(f"Trascrizione completata: {transcription}")
+
+    except Exception as e:
+        print(f"Errore nella trascrizione: {e}")
+
+def startRecording():
+    global recording
+    recording = True
+    threading.Thread(target=audioRecording).start()
+
+def stopRecording():
+    global recording
+    recording = False
+    messagebox.showinfo("Registrazione interrotta", "La registrazione è stata interrotta")
+
+btnStart = tk.Button(root, text="Inizia registrazione", command=startRecording, width=20)
+btnStart.pack(pady=10)
+
+btnStop = tk.Button(root, text="Interrompi registrazione", command=stopRecording, width=20)
+btnStop.pack(pady=10)
+
+if __name__ == "__main__":
+    root.mainloop()
