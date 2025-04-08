@@ -6,15 +6,14 @@ import sounddevice as sd
 from scipy.io.wavfile import write
 import threading
 import numpy as np
+import subprocess
 
 os.environ["PATH"] += os.pathsep + r"ffmpeg\bin"
-
 model = whisper.load_model("medium")
-
 outputDir = "audio"
 filename = os.path.join(outputDir, "recordedAudio.wav")
 recording = False
-fs = 44100
+frequency = 44100
 
 root = tk.Tk()
 root.title("TREKESP")
@@ -31,12 +30,12 @@ def audioRecording():
             if recording:
                 audioResult.append(indata.copy())
 
-        with sd.InputStream(samplerate=fs, channels=1, callback=callback):
+        with sd.InputStream(samplerate=frequency, channels=1, callback=callback):
             while recording:
                 sd.sleep(100)
 
         audioResult = np.concatenate(audioResult, axis=0)
-        write(filename, fs, audioResult)
+        write(filename, frequency, audioResult)
         print("Registrazione completata.")
 
         transcribeAudio()
@@ -50,6 +49,13 @@ def transcribeAudio():
         result = model.transcribe(filename, fp16=False, language="it")
         transcription = result["text"]
         print(f"Trascrizione completata: {transcription}")
+
+        outputTranscription = "transcription"
+        os.makedirs(outputTranscription, exist_ok=True)
+        with open(os.path.join(outputTranscription, "transcription.txt"), "w", encoding="utf-8") as f:
+            f.write(transcription)
+        result = subprocess.run(["python", "genai.py"], capture_output=True, text=True)
+        print("Coordinate: " + result.stdout)
 
     except Exception as e:
         print(f"Errore nella trascrizione: {e}")
